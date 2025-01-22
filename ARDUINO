@@ -1,0 +1,124 @@
+#include <Wire.h>
+#include <SPI.h>
+#include <SoftwareSerial.h>
+#include <TinyGPS++.h>
+#include <ESP32SPISlave.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+
+// GPS connection pins on Arduino
+#define RXPin 16
+#define TXPin 17
+SoftwareSerial ss(RXPin, TXPin);
+TinyGPSPlus gps;
+
+// Accelerometer (MPU6050) setup
+Adafruit_MPU6050 mpu;
+
+// GSM module setup
+#define GSM_RX 2
+#define GSM_TX 3
+SoftwareSerial gsmSerial(GSM_RX, GSM_TX);
+
+// Notification devices on Arduino
+#define LED_PIN 12
+#define BUZZER_PIN 14
+#define BUTTON_PIN 34 // Button to reset alerts
+
+// Speed threshold and update intervals
+float speedThreshold = 60.0; // Speed limit in km/h
+unsigned long lastMillis = 0;
+unsigned long gpsUpdateInterval = 1000; // GPS update interval in ms
+
+void setup() {
+  // Serial communication for debugging
+  Serial.begin(115200);
+  ss.begin(9600);
+
+  // Initialize accelerometer
+  if (!mpu.begin()) {
+    Serial.println("MPU6050 not found. Please check the connection.");
+    while (1);
+  }
+
+  // GSM initialization
+  gsmSerial.begin(9600);
+  delay(1000);
+  gsmSerial.println("AT"); // Simple check for GSM connectivity
+  delay(1000);
+
+  // Setup for LED, buzzer, and button
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP); // Pull-up resistor for button
+
+  // Initial GPS message
+  Serial.println("Initializing GPS...");
+}
+
+void loop() {
+  // Handle GPS updates
+  while (ss.available() > 0) {
+    gps.encode(ss.read());
+    if (gps.location.isUpdated()) {
+      float lat = gps.location.lat();
+      float lng = gps.location.lng();
+      float speed = gps.speed.kmph();
+
+      Serial.print("Lat: "); Serial.print(lat, 6);
+      Serial.print(", Lng: "); Serial.print(lng, 6);
+      Serial.print(", Speed: "); Serial.print(speed);
+      Serial.println(" km/h");
+
+      // Speed limit check
+      if (speed > speedThreshold) {
+        digitalWrite(LED_PIN, HIGH); // Alert for overspeeding
+        tone(BUZZER_PIN, 1000);
+        sendAlert("Overspeed detected: " + String(speed) + " km/h");
+      } else {
+        digitalWrite(LED_PIN, LOW);
+        noTone(BUZZER_PIN);
+      }
+    }
+  }
+
+  // Accident detection using accelerometer
+  checkForAccident();
+
+  // Reset alert if the button is pressed
+  if (digitalRead(BUTTON_PIN) == LOW) {
+    resetAlert();
+  }
+
+  delay(500); // Prevent loop overload
+}
+
+void checkForAccident() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+
+  // Check for sudden accelerations indicating a crash
+  if (a.acceleration.x > 15 || a.acceleration.y > 15 || a.acceleration.z > 15) {
+    Serial.println("Crash detected!");
+    digitalWrite(LED_PIN, HIGH);
+    tone(BUZZER_PIN, 1500);
+    sendAlert("Crash detected! Please send help.");
+  }
+}
+
+void sendAlert(String message) {
+  gsmSerial.println("AT+CMGF=1"); // Set SMS mode
+  delay(100);
+  gsmSerial.println("AT+CMGS=\"+30XXXXXXXXX\""); // Replace with actual phone number
+  delay(100);
+  gsmSerial.println(message);
+  delay(100);
+  gsmSerial.write(26); // End SMS command
+  delay(1000);
+}
+
+void resetAlert() {
+  digitalWrite(LED_PIN, LOW);
+  noTone(BUZZER_PIN);
+  Serial.println("Alert reset.");
+}
