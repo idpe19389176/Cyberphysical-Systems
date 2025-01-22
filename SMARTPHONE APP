@@ -1,0 +1,97 @@
+//This phone app is designed to show the exact bus locations to parents and school administration. To write it I used ''React Native Platform'' from meta, to which I am familliar to. 
+//I will only explain the lines that concern the operation of the application and not those that are the body of the platform (which either simply have to be entered, or appear automatically).
+
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
+
+const App = () => {
+  const [buses, setBuses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Here we use a  server which includes the locations of the buses and it is refreshed from the GSM modules. We assume that we keep this server to an online location in UNIWA so the app can refresh worlwide.
+  useEffect(() => {
+    fetch('https://idpe.uniwa.gr/buseslist.txt')
+      .then(response => response.json())
+      .then(data => {
+        setBuses(data);
+        setLoading(false);
+      })
+      .catch(error => {
+        console.error(΄΄Σφάλμα εύρεσης των λεωφορείων''):", error); //In case that our server is down fsr.
+        setLoading(false);
+      });
+  }, []);
+
+  // Here we have some app styling, because we have GUI
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
+//Here I initialize the map on the app. I chose react native maps, because it's easier than using with a Google Maps API token that needs to be refreshed every 5 days
+  return (
+    <View style={styles.container}>
+      <MapView
+        style={styles.map}
+        initialRegion={{        //Region of school
+          latitude: 37.9838,
+          longitude: 23.7275,
+          latitudeDelta: 0.1,
+          longitudeDelta: 0.1,
+        }}
+      >
+        {buses.map(bus => (
+          <Marker
+            key={bus.id}
+            coordinate={{
+              latitude: bus.location.lat,
+              longitude: bus.location.lon,
+            }}
+            title={`Λεωφορείο ${bus.id}`}                    //Here are the school buses and the speed for each bus live.
+            description={`Ταχύτητα: ${bus.speed} km/h`}
+          />
+        ))}
+      </MapView>
+                                                                                            //Just some design stuff for the app to be user-friendly
+      <View style={styles.infoContainer}>
+        <Text style={styles.title}>Ζωντανή Τοποθεσία Λεωφορείων</Text>
+        {buses.map(bus => (
+          <View key={bus.id} style={styles.busInfo}>
+            <Text>{`Λεωφορείο ${bus.id}: ${bus.location.lat}, ${bus.location.lon}`}</Text>
+            <Text>{`Ταχύτητα: ${bus.speed} km/h`}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({        /Also all these are app styling that generates automatically threw the platform by choosing basic GUI settings
+  container: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'stretch',
+  },
+  map: {
+    flex: 1,
+  },
+  infoContainer: {
+    padding: 10,
+    backgroundColor: 'white',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  busInfo: {
+    marginBottom: 10,
+  },
+});
+
+
+//In order for this app to run, an emulator must be used. This app can run on both iOS and Android Phone by using the correct emulator.
+//Thank you for reading my code :)
