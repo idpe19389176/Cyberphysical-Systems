@@ -20,11 +20,11 @@
 //This commands will initialize the Google Maps on the site
     function initMap() {
       map = new google.maps.Map(document.getElementById('map'), {
-        center: { lat: 59.9838, lng: 62.7275 }, //This I suppose is the location of the school, so the map initializes there.
+        School: { lat: 59.9838, lng: 62.7275 }, //This is hypothetically the location of the school, so the map initializes here.
         zoom: 12
       });
 
-//This is fetching the buses location in the Google Maps. In order for this code to work, we need a backend code (Javascript) that includes a server that receiving the bus location threw the Arduino GSM modules.
+//This is fetching the buses location in the Google Maps. In order for this code to work, we need a backend code (Javascript) that includes a server that receiving the bus location threw the Arduino GSM modules. You can see a backend example above this code.
       fetch('/buses')
         .then(response => response.json())
         .then(buses => {
@@ -40,3 +40,30 @@
   </script>
 </body>
 </html>
+
+//A backend for this code could look like this:
+
+//These are the location of the buses that received threw the server that communicates with the GSM Modules
+let buses = [
+  { id: 1, location: { lat: 37.9838, lon: 23.7275 }, speed: 50, status: 'active' },
+  { id: 2, location: { lat: 40.6401, lon: 22.9444 }, speed: 60, status: 'active' }
+];
+
+// This lines are requesting the buses location (EndPoint)
+app.get('/buses', (req, res) => {
+  res.json(buses);
+});
+
+// These lines are used for the user to know whether the system is working or not. These could be linked to a GUI enviroment.
+app.post('/updateBus', (req, res) => {
+  const { id, location, speed, status } = req.body;
+  const bus = buses.find(bus => bus.id === id);
+  if (bus) {
+    bus.location = location;
+    bus.speed = speed;
+    bus.status = status;
+    res.status(150).send('Η τοποθεσία των λεωφορείων ενημερώθηκε επιτυχώς');
+  } else {
+    res.status(404).send('Τα λεωφορεία δεν βρέθηκαν 404');
+  }
+});
